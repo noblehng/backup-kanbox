@@ -1,7 +1,3 @@
-require "json"
-require "kanbox"
-require "oauth2"
-
 module Backup
   module Storage
     class Kanbox < Base
@@ -61,7 +57,7 @@ module Backup
       end
 
       def cached_file
-        File.join(Config.cache_path, self.api_key + self.api_secret)
+        File.join(Config.cache_path, "kanbox-" + self.api_key + "-" + self.api_secret)
       end
       
       def transfer!
