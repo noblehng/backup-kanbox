@@ -30,6 +30,7 @@ module Backup
           auth_code = $stdin.gets.chomp.split("\n").first
           @connection.token!(auth_code)
           save_session(@connection.access_token)
+          puts "Authorize successed!"
         end
         @connection
       end
