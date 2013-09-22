@@ -18,7 +18,7 @@ require "backup-kanbox" # 引用 backup-kanbox
 
 Backup::Model.new(:kanbox_foo, 'Description for foo') do
 
-  # 配置阿里云 OSS 作为备份存储方式, 注意，Kanbox 这个地方需要引号
+  # 备份存储方式, 注意，Kanbox 这个地方需要引号
   store_with "Kanbox" do |config|
     # 开发者帐号申请: http://open.kanbox.com
     config.api_key = 'api key'
