@@ -60,8 +60,8 @@ module Backup
           stored_data = File.open(cached_file).read
           @session = OAuth2::AccessToken.from_hash(@connection.oauth_client, JSON.parse(stored_data))
           if @session.expired?
-            Logger.info "Access Token has expired, not refresh a new token..."
-            @session.refresh!
+            Logger.info "Access Token has expired, now refresh a new token..."
+            @session = @session.refresh!
             Logger.info "Refresh successed. #{@session.token}"
             save_session(@session)
           end
