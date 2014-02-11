@@ -1,12 +1,24 @@
 module Backup
   module Storage
     class Kanbox < Base
+      include Storage::Cycler
       attr_accessor :api_key, :api_secret, :path
+      ##  
+      # Path to store cached authorized session.
+      #   
+      # Relative paths will be expanded using Config.root_path,
+      # which by default is ~/Backup unless --root-path was used
+      # on the command line or set in config.rb.
+      #   
+      # By default, +cache_path+ is '.cache', which would be
+      # '~/Backup/.cache/' if using the default root_path.
+      attr_accessor :cache_path
 
       def initialize(model, storage_id = nil, &block)
         super(model, storage_id)
 
         @path ||= 'backups'
+        @cache_path ||= '.cache'
 
         instance_eval(&block) if block_given?
       end
@@ -58,7 +70,9 @@ module Backup
       end
 
       def cached_file
-        File.join(Config.cache_path, "kanbox-" + self.api_key + "-" + self.api_secret)
+        @cache_path = cache_path.start_with?('/') ?
+                      cache_path : File.join(Config.root_path, cache_path)
+        File.join(cache_path, "kanbox-" + self.api_key + "-" + self.api_secret)
       end
       
       def transfer!
