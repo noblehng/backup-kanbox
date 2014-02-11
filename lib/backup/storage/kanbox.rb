@@ -26,12 +26,11 @@ module Backup
       private
 
       def connection
-        return @connection if @connection
-        @api_key = self.api_key
-        @api_secret = self.api_secret
-        @connection = ::Kanbox::Client.new { }
-        @connection.api_key = self.api_key
-        @connection.api_secret = self.api_secret
+        unless @connection
+          @connection = ::Kanbox::Client.new { }
+          @connection.api_key = self.api_key
+          @connection.api_secret = self.api_secret
+        end
         
         if session
           @connection.access_token = session
@@ -55,7 +54,6 @@ module Backup
       end
       
       def session
-        return @session if @session
         if File.exist?(cached_file)
           stored_data = File.open(cached_file).read
           @session = OAuth2::AccessToken.from_hash(@connection.oauth_client, JSON.parse(stored_data))
