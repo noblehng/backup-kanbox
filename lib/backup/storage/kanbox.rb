@@ -32,39 +32,41 @@ module Backup
           @connection.api_secret = self.api_secret
         end
         
-        if session
-          @connection.access_token = session
-        else
-          puts "First use Kanbox you need authorize first!\n\n"
-          puts @connection.authorize_url
-          print "Type 'code' in callback url:"
-          auth_code = $stdin.gets.chomp.split("\n").first
-          @connection.token!(auth_code)
-          save_session(@connection.access_token)
-          puts "Authorize successed!"
-        end
+        @connection.access_token = create_session!
         @connection
       end
-      
-      def save_session(s)
-        @access_token = s
-        File.open(cached_file,"w") do |f|
-          f.puts @access_token.to_hash.to_json
-        end
-      end
-      
-      def session
-        if File.exist?(cached_file)
-          stored_data = File.open(cached_file).read
-          @session = OAuth2::AccessToken.from_hash(@connection.oauth_client, JSON.parse(stored_data))
-          if @session.expired?
-            Logger.info "Access Token has expired, now refresh a new token..."
-            @session = @session.refresh!
-            Logger.info "Refresh successed. #{@session.token}"
-            save_session(@session)
+
+      def create_session!
+        unless @session
+          if File.exist?(cached_file)
+            File.open(cached_file, 'rb') do |f|
+              @session = OAuth2::AccessToken.from_hash(@connection.oauth_client, JSON.parse(f.read))
+            end
+          else
+            puts "First use Kanbox you need authorize first!\n\n"
+            puts @connection.authorize_url
+            print "Type 'code' in callback url:"
+            auth_code = $stdin.gets.chomp.split("\n").first
+            @connection.token!(auth_code)
+            @session = @connection.access_token
+            save_session!
           end
         end
+        refresh_session! if @session.expired?
         @session
+      end
+      
+      def save_session!
+        File.open(cached_file,"w") do |f|
+          f.puts @session.to_hash.to_json
+        end
+      end
+
+      def refresh_session!
+        Logger.info "Access Token has expired, now refresh a new token..."
+        @session = @session.refresh!
+        Logger.info "Refresh successed. #{@session.token}"
+        save_session!
       end
 
       def cached_file
