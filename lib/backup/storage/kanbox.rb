@@ -2,23 +2,46 @@ module Backup
   module Storage
     class Kanbox < Base
       include Storage::Cycler
-      attr_accessor :api_key, :api_secret, :path
+      class Error < Backup::Error; end
+
+      ##
+      # Kanbox API credentials
+      attr_accessor :api_key, :api_secret
+
+      ##
+      # Remote upload path
+      attr_accessor :path
+
       ##  
       # Path to store cached authorized session.
-      #   
+      #
       # Relative paths will be expanded using Config.root_path,
       # which by default is ~/Backup unless --root-path was used
       # on the command line or set in config.rb.
-      #   
+      #
       # By default, +cache_path+ is '.cache', which would be
       # '~/Backup/.cache/' if using the default root_path.
       attr_accessor :cache_path
+
+      ##
+      # Number of times to retry failed operations.
+      #
+      # Default: 5
+      attr_accessor :max_retries
+
+      ##
+      # Time in seconds to pause before each retry.
+      #
+      # Default: 5
+      attr_accessor :retry_waitsec
 
       def initialize(model, storage_id = nil, &block)
         super(model, storage_id)
 
         @path ||= 'backups'
         @cache_path ||= '.cache'
+        @max_retries    ||= 5
+        @retry_waitsec  ||= 5
 
         instance_eval(&block) if block_given?
       end
@@ -31,7 +54,7 @@ module Backup
           @connection.api_key = self.api_key
           @connection.api_secret = self.api_secret
         end
-        
+
         @connection.access_token = create_session!
         @connection
       end
@@ -55,7 +78,7 @@ module Backup
         refresh_session! if @session.expired?
         @session
       end
-      
+
       def save_session!
         File.open(cached_file,"w") do |f|
           f.puts @session.to_hash.to_json
@@ -74,14 +97,38 @@ module Backup
                       cache_path : File.join(Config.root_path, cache_path)
         File.join(cache_path, "kanbox-" + self.api_key + "-" + self.api_secret)
       end
-      
+
       def transfer!
         remote_path = remote_path_for(package)
         package.filenames.each do |filename|
           src = File.join(Config.tmp_path, filename)
           dest = File.join(remote_path, filename)
           Logger.info "Storing '#{ dest }'..."
-          connection.put(dest, src)
+
+          with_retries do
+            result = connection.put(dest, src)
+            unless result.success == true
+              refresh_session! if result.error_code == '401'
+              raise "HTTP status code: #{ result.error_code }"
+            end
+          end
+        end
+
+      rescue => err
+        raise Error.wrap(err, 'Upload Failed!')
+      end
+
+      def with_retries
+        retries = 0
+        begin
+          yield
+        rescue StandardError => err
+          retries += 1
+          raise if retries > max_retries
+
+          Logger.info Error.wrap(err, "Retry ##{ retries } of #{ max_retries }.")
+          sleep(retry_waitsec)
+          retry
         end
       end
 
