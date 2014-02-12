@@ -80,7 +80,8 @@ module Backup
       end
 
       def save_session!
-        File.open(cached_file,"w") do |f|
+        FileUtils.mkdir_p File.dirname(cached_file), :mode => 0700
+        File.open(cached_file,"w", 0600) do |f|
           f.puts @session.to_hash.to_json
         end
       end
